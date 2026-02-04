@@ -111,74 +111,57 @@ b5.Game.Input.bindMouse();
 
 b5.Game.Input.updateInput = function() {
 	//Player one, only on host
-	//Use gui, keyboard and gamepad as input.
-	//If player 2 joined, use only gui and keyboard
-	//._update(player,useGui,useKeyboard,useGamepad)
+	//Use keyboard and mouse as input
 	var mp = b5.Game.Multiplayer;
-	
-	//Get gamepads length, if more than one is present, use both for player 1 and 2 respectively
-	//Else gamepad on index 0 will be for player 2
-  for(var i = 0, g = 0; i < app.connected_gamepads.length; i++) app.connected_gamepads[i] !== null && g++;
-  this.gamepadLength = g;
 
-	var allowGui = !app.mobile,
-	allowGamepad = !app.mobile;
-	!mp.isGuest && this._update(0, allowGui, true, allowGamepad && (!mp.player2Joined || (this.gamepadLength > 1)));
-	//Player two: controller on local, gui/controller/gamepad on host
-  (mp.isPlayer2 || mp.player2Joined) && !mp.isHosting && this._update(1, allowGui && mp.isGuest, mp.isGuest, allowGamepad && (mp.player2Joined || mp.isGuest));
+	var allowKeyboard = true;
+	!mp.isGuest && this._update(0, allowKeyboard);
+	//Player two: keyboard on local
+  (mp.isPlayer2 || mp.player2Joined) && !mp.isHosting && this._update(1, mp.isGuest);
 };
 
-b5.Game.Input._update = function(pl,useGUI,useKeyboard,useGamepad) {
+b5.Game.Input._update = function(pl,useKeyboard) {
 	var player = pl ? 'p2': 'p1',
-	gamepadcfg = b5.Game.cfg.Gamepad,
-  gamepadplayer = this.Gamepad['player'+player.substr(1)],
 	inputplayer = pl ? this.player2: this.player1,
 	input = function(key, type) {
 		return b5.Game.Input.checkInput(type ? 'gamepad': 'keyboard', player, key);
 	};
-  
-  //Use gamepad for second player on local (disable if two players has gamepads)
-  b5.Game.Multiplayer.player2Joined && pl && this.gamepadLength < 2 && (gamepadplayer.gamepad_index = 0);
-  
-	//Update last registered input from device
-	//Gui
-	if (this.input_player[player] != "GUI" && useGUI) for (var i in b5.Game.GUI.buttons) if (b5.Game.GUI.buttons[i].name != "HideShow" && b5.Game.GUI.buttons[i].touching) {
-		this.input_player[player] = "GUI";
-		break;
-	}
+
+	//========================================
+	// SIMPLIFIED INPUT SYSTEM
+	// Teclado = Movimento (axis_x, axis_y)
+	// Mouse = Ações (shoot B, lock L)
+	//========================================
+
+	// 1. Ler movimento do TECLADO (sempre disponível)
+	var keyboard_axis_x = -input('key_left', 0) || input('key_right', 0);
+	var keyboard_axis_y = -input('key_up', 0) || input('key_down', 0);
+	
+	// 2. Ler ações do MOUSE (sempre disponível, nunca conflita com teclado)
+	var mouse_shoot = this.Mouse.left ? 1 : 0;
+	var mouse_lock = this.Mouse.right ? 1 : 0;
+
+	//Update last registered input from device (for display/detection purposes)
 	//Keyboard
-	if (this.input_player[player] != "Keyboard" && useKeyboard) for (var i in this.Keyboard.raw) if (this.Keyboard.raw[i]) {
-		// Only switch to Keyboard if NOT already using Mouse
+	if (this.input_player[player] != "Keyboard" && useKeyboard && (keyboard_axis_x !== 0 || keyboard_axis_y !== 0)) {
 		if (this.input_player[player] != "Mouse") {
 			this.input_player[player] = "Keyboard";
 		}
-		break;
 	}
-	//Gamepad
-	if (this.input_player[player] != "Gamepad" && gamepadplayer.connected && useGamepad) {
-		for (var i in gamepadplayer.button) if (gamepadplayer.button[i] != 0) {
-			this.input_player[player] = "Gamepad";
-			break;
-		}
-		for (var i in gamepadplayer.axis) if (Math.abs(gamepadplayer.axis[i].x) > 0.6 || Math.abs(gamepadplayer.axis[i].y) > 0.6) {
-			this.input_player[player] = "Gamepad";
-			break;
-		}
-	}
-	//Mouse - Always prioritize when clicked, keep active while buttons pressed
+	//Mouse - Only when actually clicking
 	if (useKeyboard && (this.Mouse.left || this.Mouse.right)) {
 		this.input_player[player] = "Mouse";
 	}
-	//Return to Keyboard only when mouse is fully released AND no other device is active
+	//Return to Keyboard only when mouse is fully released
 	else if (this.input_player[player] == "Mouse" && !this.Mouse.left && !this.Mouse.right) {
 		this.input_player[player] = "Keyboard";
 	}
 
 	switch (this.input_player[player]) {
 		case "Keyboard":
-			//Keyboard controls
-			inputplayer.axis_x = -input('key_left', 0) || input('key_right', 0);
-			inputplayer.axis_y = -input('key_up', 0) || input('key_down', 0);
+			//Keyboard controls - movement only
+			inputplayer.axis_x = keyboard_axis_x;
+			inputplayer.axis_y = keyboard_axis_y;
 
 			//Use escape and enter buttons to navigate in menus
 			var keyboardplayer = this.Keyboard.raw,
@@ -193,65 +176,28 @@ b5.Game.Input._update = function(pl,useGUI,useKeyboard,useGamepad) {
 			inputplayer.Start = input('key_pause', 0);
 			break;
 		case "Mouse":
-			//Mouse click controls - left click for B (shoot), right click for L (lock)
-			//Seamless combination of mouse actions and keyboard movement
-			//CRITICAL: Preserve mouse button states even when keyboard is pressed
+			//Mouse: Shoot (left) + Lock (right) + Keyboard movement
+			//IMPORTANT: Mouse ONLY controls B (shoot) and L (lock)
+			//Movement ALWAYS comes from keyboard
 			
-			// Read movement from keyboard
-			var movement_x = -input('key_left', 0) || input('key_right', 0);
-			var movement_y = -input('key_up', 0) || input('key_down', 0);
+			// When lock is active, disable keyboard movement
+			// Otherwise allow keyboard movement
+			var final_axis_x = mouse_lock ? 0 : keyboard_axis_x;
+			var final_axis_y = mouse_lock ? 0 : keyboard_axis_y;
 			
-			// Get mouse actions - MUST always read directly from Mouse object, not cache
-			var mouse_shoot = this.Mouse.left ? 1 : 0;
-			var mouse_lock = this.Mouse.right ? 1 : 0;
-			
-			// When lock is active, disable movement; otherwise allow keyboard movement
-			inputplayer.axis_x = mouse_lock ? 0 : movement_x;
-			inputplayer.axis_y = mouse_lock ? 0 : movement_y;
+			inputplayer.axis_x = final_axis_x;
+			inputplayer.axis_y = final_axis_y;
 
-			// Always set all buttons to avoid losing state from previous frames
 			inputplayer.A = 0;
-			inputplayer.B = mouse_shoot;  // Shoot/Atirar
+			inputplayer.B = mouse_shoot;  // Left click = shoot/atirar
 			inputplayer.X = 0;
 			inputplayer.Y = 0;
-			inputplayer.L = mouse_lock;   // Lock/Trancar
+			inputplayer.L = mouse_lock;   // Right click = lock/trancar
 			inputplayer.R = 0;
 			inputplayer.Start = 0;
 			break;
-		case "Gamepad":
-			//Use standard gamepad dpad to navigate in menus
-			var inMenu = b5.Game.Flags.inSomeMenu || b5.Game.Flags.inPauseMenu;
-			inputplayer.axis_x = input('axis_x', 1) || (inMenu && gamepadplayer.axis.HAT.x) || 0;
-			inputplayer.axis_y = input('axis_y', 1) || (inMenu && gamepadplayer.axis.HAT.y) || 0;
-
-			inputplayer.A = input('btn_jump', 1);
-			//Use standard gamepad B button to navigate back in menus
-			inputplayer.B = inMenu ? gamepadplayer.button.B: input('btn_shoot', 1);
-			inputplayer.X = input('btn_dash', 1);
-			inputplayer.Y = input('btn_ex', 1);
-			inputplayer.L = input('btn_lock', 1);
-			inputplayer.R = input('btn_wpn', 1);
-			inputplayer.Start = input('btn_pause', 1);
-			
-			if(!b5.Game.Multiplayer.player2Joined && !b5.Game.Multiplayer.isGuest) gamepadplayer.button.SELECT > 0.5 && b5.Game.Multiplayer.addPlayer2();
-
-			break;
-		case "GUI":
-			var guibtns = b5.Game.GUI.buttons;
-			//GUI Controls
-			inputplayer.axis_x = guibtns.DPAD.axis.x;
-			inputplayer.axis_y = guibtns.DPAD.axis.y;
-
-			inputplayer.A = guibtns.A.value;
-			inputplayer.B = guibtns.B.value;
-			inputplayer.X = guibtns.X.value;
-			inputplayer.Y = guibtns.Y.value;
-			inputplayer.L = guibtns.L.value;
-			inputplayer.R = guibtns.R.value;
-			inputplayer.Start = guibtns.Pause.value;
-
-		}
-	};
+	}
+};
 
 	//Controls GUI for phones
 	(function() {

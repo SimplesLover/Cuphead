@@ -148,7 +148,10 @@ b5.Game.Input._update = function(pl,useGUI,useKeyboard,useGamepad) {
 	}
 	//Keyboard
 	if (this.input_player[player] != "Keyboard" && useKeyboard) for (var i in this.Keyboard.raw) if (this.Keyboard.raw[i]) {
-		this.input_player[player] = "Keyboard";
+		// Only switch to Keyboard if NOT already using Mouse
+		if (this.input_player[player] != "Mouse") {
+			this.input_player[player] = "Keyboard";
+		}
 		break;
 	}
 	//Gamepad
@@ -162,12 +165,12 @@ b5.Game.Input._update = function(pl,useGUI,useKeyboard,useGamepad) {
 			break;
 		}
 	}
-	//Mouse
-	if (this.input_player[player] != "Mouse" && useKeyboard && (this.Mouse.left || this.Mouse.right)) {
+	//Mouse - Always prioritize when clicked, keep active while buttons pressed
+	if (useKeyboard && (this.Mouse.left || this.Mouse.right)) {
 		this.input_player[player] = "Mouse";
 	}
-	//Return to Keyboard when mouse is not pressed
-	if (this.input_player[player] == "Mouse" && !this.Mouse.left && !this.Mouse.right) {
+	//Return to Keyboard only when mouse is fully released AND no other device is active
+	else if (this.input_player[player] == "Mouse" && !this.Mouse.left && !this.Mouse.right) {
 		this.input_player[player] = "Keyboard";
 	}
 
@@ -192,12 +195,13 @@ b5.Game.Input._update = function(pl,useGUI,useKeyboard,useGamepad) {
 		case "Mouse":
 			//Mouse click controls - left click for B (shoot), right click for L (lock)
 			//Seamless combination of mouse actions and keyboard movement
+			//CRITICAL: Preserve mouse button states even when keyboard is pressed
 			
 			// Read movement from keyboard
 			var movement_x = -input('key_left', 0) || input('key_right', 0);
 			var movement_y = -input('key_up', 0) || input('key_down', 0);
 			
-			// Get mouse actions
+			// Get mouse actions - MUST always read directly from Mouse object, not cache
 			var mouse_shoot = this.Mouse.left ? 1 : 0;
 			var mouse_lock = this.Mouse.right ? 1 : 0;
 			
@@ -205,11 +209,12 @@ b5.Game.Input._update = function(pl,useGUI,useKeyboard,useGamepad) {
 			inputplayer.axis_x = mouse_lock ? 0 : movement_x;
 			inputplayer.axis_y = mouse_lock ? 0 : movement_y;
 
+			// Always set all buttons to avoid losing state from previous frames
 			inputplayer.A = 0;
-			inputplayer.B = mouse_shoot;
+			inputplayer.B = mouse_shoot;  // Shoot/Atirar
 			inputplayer.X = 0;
 			inputplayer.Y = 0;
-			inputplayer.L = mouse_lock;
+			inputplayer.L = mouse_lock;   // Lock/Trancar
 			inputplayer.R = 0;
 			inputplayer.Start = 0;
 			break;

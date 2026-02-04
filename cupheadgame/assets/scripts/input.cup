@@ -96,10 +96,15 @@ b5.Game.Input.bindMouse = function() {
 		}
 	};
 	target.addEventListener('mousedown', function(e) { 
+		e.preventDefault();
 		setButton(e, true);
 	});
 	target.addEventListener('mouseup', function(e) { 
+		e.preventDefault();
 		setButton(e, false);
+	});
+	target.addEventListener('contextmenu', function(e) { 
+		e.preventDefault();
 	});
 	target.addEventListener('mouseleave', function() {
 		self.Mouse.left = false;
@@ -195,8 +200,9 @@ b5.Game.Input._update = function(pl,useGUI,useKeyboard,useGamepad) {
 			break;
 		case "Mouse":
 			//Mouse click controls - left click for B (shoot), right click for L (lock)
-			inputplayer.axis_x = 0;
-			inputplayer.axis_y = 0;
+			//Allow movement while using mouse
+			inputplayer.axis_x = -input('key_left', 0) || input('key_right', 0);
+			inputplayer.axis_y = -input('key_up', 0) || input('key_down', 0);
 
 			inputplayer.A = 0;
 			inputplayer.B = this.Mouse.left ? 1 : 0;

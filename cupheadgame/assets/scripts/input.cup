@@ -71,9 +71,7 @@ b5.Game.Input.Keyboard.lowercase_raw = true; //Support for appx keyboard api on 
 
 b5.Game.Input.Mouse = {
 	left: false,
-	right: false,
-	leftClicked: false,
-	rightClicked: false
+	right: false
 };
 
 b5.Game.Input.bindMouse = function() {
@@ -83,15 +81,9 @@ b5.Game.Input.bindMouse = function() {
 	target = app && app.canvas ? app.canvas : window,
 	setButton = function(e, value) {
 		if (e.button === 0) {
-			if (value && !self.Mouse.left) {
-				self.Mouse.leftClicked = true;
-			}
 			self.Mouse.left = value;
 		}
 		if (e.button === 2) {
-			if (value && !self.Mouse.right) {
-				self.Mouse.rightClicked = true;
-			}
 			self.Mouse.right = value;
 		}
 	};
@@ -134,10 +126,6 @@ b5.Game.Input.updateInput = function() {
 	!mp.isGuest && this._update(0, allowGui, true, allowGamepad && (!mp.player2Joined || (this.gamepadLength > 1)));
 	//Player two: controller on local, gui/controller/gamepad on host
   (mp.isPlayer2 || mp.player2Joined) && !mp.isHosting && this._update(1, allowGui && mp.isGuest, mp.isGuest, allowGamepad && (mp.player2Joined || mp.isGuest));
-  
-  // Reset mouse click flags after processing input
-  this.Mouse.leftClicked = false;
-  this.Mouse.rightClicked = false;
 };
 
 b5.Game.Input._update = function(pl,useGUI,useKeyboard,useGamepad) {
@@ -175,8 +163,12 @@ b5.Game.Input._update = function(pl,useGUI,useKeyboard,useGamepad) {
 		}
 	}
 	//Mouse
-	if (this.input_player[player] != "Mouse" && useKeyboard && (this.Mouse.leftClicked || this.Mouse.rightClicked)) {
+	if (this.input_player[player] != "Mouse" && useKeyboard && (this.Mouse.left || this.Mouse.right)) {
 		this.input_player[player] = "Mouse";
+	}
+	//Return to Keyboard when mouse is not pressed
+	if (this.input_player[player] == "Mouse" && !this.Mouse.left && !this.Mouse.right) {
+		this.input_player[player] = "Keyboard";
 	}
 
 	switch (this.input_player[player]) {
@@ -199,15 +191,25 @@ b5.Game.Input._update = function(pl,useGUI,useKeyboard,useGamepad) {
 			break;
 		case "Mouse":
 			//Mouse click controls - left click for B (shoot), right click for L (lock)
-			//Allow movement from keyboard while using mouse to shoot/lock
-			inputplayer.axis_x = -input('key_left', 0) || input('key_right', 0);
-			inputplayer.axis_y = -input('key_up', 0) || input('key_down', 0);
+			//Seamless combination of mouse actions and keyboard movement
+			
+			// Read movement from keyboard
+			var movement_x = -input('key_left', 0) || input('key_right', 0);
+			var movement_y = -input('key_up', 0) || input('key_down', 0);
+			
+			// Get mouse actions
+			var mouse_shoot = this.Mouse.left ? 1 : 0;
+			var mouse_lock = this.Mouse.right ? 1 : 0;
+			
+			// When lock is active, disable movement; otherwise allow keyboard movement
+			inputplayer.axis_x = mouse_lock ? 0 : movement_x;
+			inputplayer.axis_y = mouse_lock ? 0 : movement_y;
 
 			inputplayer.A = 0;
-			inputplayer.B = this.Mouse.left ? 1 : 0;
+			inputplayer.B = mouse_shoot;
 			inputplayer.X = 0;
 			inputplayer.Y = 0;
-			inputplayer.L = this.Mouse.right ? 1 : 0;
+			inputplayer.L = mouse_lock;
 			inputplayer.R = 0;
 			inputplayer.Start = 0;
 			break;

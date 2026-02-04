@@ -71,7 +71,9 @@ b5.Game.Input.Keyboard.lowercase_raw = true; //Support for appx keyboard api on 
 
 b5.Game.Input.Mouse = {
 	left: false,
-	right: false
+	right: false,
+	leftClicked: false,
+	rightClicked: false
 };
 
 b5.Game.Input.bindMouse = function() {
@@ -80,11 +82,25 @@ b5.Game.Input.bindMouse = function() {
 	var self = this,
 	target = app && app.canvas ? app.canvas : window,
 	setButton = function(e, value) {
-		e.button === 0 && (self.Mouse.left = value);
-		e.button === 2 && (self.Mouse.right = value);
+		if (e.button === 0) {
+			if (value && !self.Mouse.left) {
+				self.Mouse.leftClicked = true;
+			}
+			self.Mouse.left = value;
+		}
+		if (e.button === 2) {
+			if (value && !self.Mouse.right) {
+				self.Mouse.rightClicked = true;
+			}
+			self.Mouse.right = value;
+		}
 	};
-	target.addEventListener('mousedown', function(e) { setButton(e, true); });
-	target.addEventListener('mouseup', function(e) { setButton(e, false); });
+	target.addEventListener('mousedown', function(e) { 
+		setButton(e, true);
+	});
+	target.addEventListener('mouseup', function(e) { 
+		setButton(e, false);
+	});
 	target.addEventListener('mouseleave', function() {
 		self.Mouse.left = false;
 		self.Mouse.right = false;
@@ -114,6 +130,10 @@ b5.Game.Input.updateInput = function() {
 	!mp.isGuest && this._update(0, allowGui, true, allowGamepad && (!mp.player2Joined || (this.gamepadLength > 1)));
 	//Player two: controller on local, gui/controller/gamepad on host
   (mp.isPlayer2 || mp.player2Joined) && !mp.isHosting && this._update(1, allowGui && mp.isGuest, mp.isGuest, allowGamepad && (mp.player2Joined || mp.isGuest));
+  
+  // Reset mouse click flags after processing input
+  this.Mouse.leftClicked = false;
+  this.Mouse.rightClicked = false;
 };
 
 b5.Game.Input._update = function(pl,useGUI,useKeyboard,useGamepad) {
@@ -150,6 +170,10 @@ b5.Game.Input._update = function(pl,useGUI,useKeyboard,useGamepad) {
 			break;
 		}
 	}
+	//Mouse
+	if (this.input_player[player] != "Mouse" && useKeyboard && (this.Mouse.leftClicked || this.Mouse.rightClicked)) {
+		this.input_player[player] = "Mouse";
+	}
 
 	switch (this.input_player[player]) {
 		case "Keyboard":
@@ -168,6 +192,19 @@ b5.Game.Input._update = function(pl,useGUI,useKeyboard,useGamepad) {
 			inputplayer.L = input('key_wpn', 0);
 			inputplayer.R = input('key_lock', 0);
 			inputplayer.Start = input('key_pause', 0);
+			break;
+		case "Mouse":
+			//Mouse click controls - left click for B (shoot), right click for L (lock)
+			inputplayer.axis_x = 0;
+			inputplayer.axis_y = 0;
+
+			inputplayer.A = 0;
+			inputplayer.B = this.Mouse.left ? 1 : 0;
+			inputplayer.X = 0;
+			inputplayer.Y = 0;
+			inputplayer.L = this.Mouse.right ? 1 : 0;
+			inputplayer.R = 0;
+			inputplayer.Start = 0;
 			break;
 		case "Gamepad":
 			//Use standard gamepad dpad to navigate in menus

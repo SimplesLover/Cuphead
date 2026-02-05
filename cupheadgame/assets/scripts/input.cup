@@ -155,20 +155,15 @@ b5.Game.Input._update = function(pl,useKeyboard) {
 			//IMPORTANT: Mouse ONLY controls B (shoot) and L (lock)
 			//Movement ALWAYS comes from keyboard
 			
-			// When lock is active, disable keyboard movement
-			// Otherwise allow keyboard movement
-			var final_axis_x = mouse_lock ? 0 : keyboard_axis_x;
-			var final_axis_y = mouse_lock ? 0 : keyboard_axis_y;
-			
-			inputplayer.axis_x = final_axis_x;
-			inputplayer.axis_y = final_axis_y;
+			inputplayer.axis_x = keyboard_axis_x;
+			inputplayer.axis_y = keyboard_axis_y;
 
-			inputplayer.A = 0;
+			inputplayer.A = input('key_jump', 0);
 			inputplayer.B = mouse_shoot;  // Left click = shoot/atirar
 			inputplayer.X = 0;
 			inputplayer.Y = 0;
-			inputplayer.L = mouse_lock;   // Right click = lock/trancar
-			inputplayer.R = 0;
+			inputplayer.L = 0;
+			inputplayer.R = mouse_lock;   // Right click = lock/trancar
 			inputplayer.Start = 0;
 			break;
 	}

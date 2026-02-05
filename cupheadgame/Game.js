@@ -292,6 +292,32 @@ b5.loadgame = function() {
 		}
 	};
 	b5.Game.speed = 1;
+	if (!b5.Game.GUI) {
+		var noop = function() {};
+		var noopButton = { onEndTouch: noop, visible: true };
+		b5.Game.GUI = {
+			active: true,
+			buttons: {
+				DPAD: noopButton,
+				Pause: noopButton,
+				A: noopButton,
+				B: noopButton
+			},
+			buttonDefs: {
+				jump: "A",
+				shoot: "B",
+				dash: "X",
+				ex: "Y",
+				lock: "LB",
+				wpn: "RB",
+				pause: "START"
+			},
+			disableButtons: function() { this.active = false; },
+			enableAllButtons: function() { this.active = true; },
+			enableButtons: function() { this.active = true; },
+			organize: noop
+		};
+	}
 	//Create game folders and files if they doesn't exist (app does it automatically)
 	//Copy base game config to storage
 

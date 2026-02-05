@@ -297,6 +297,7 @@ b5.loadgame = function() {
 		var noopButton = { onEndTouch: noop, visible: true };
 		b5.Game.GUI = {
 			active: true,
+			hidden: false,
 			buttons: {
 				DPAD: noopButton,
 				Pause: noopButton,
@@ -315,6 +316,8 @@ b5.loadgame = function() {
 			disableButtons: function() { this.active = false; },
 			enableAllButtons: function() { this.active = true; },
 			enableButtons: function() { this.active = true; },
+			show: function() { this.hidden = false; },
+			hide: function() { this.hidden = true; },
 			organize: noop
 		};
 	}
